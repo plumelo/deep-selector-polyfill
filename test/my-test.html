@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <script src="../node_modules/mocha/mocha.js"></script>
+    <script src="../node_modules/chai/chai.js"></script>
+    <script src="../node_modules/wct-mocha/wct-mocha.js"></script>
+  </head>
+  <body>
+    <my-el id="root">
+      <template>
+        <p class="shadow">I'm in the shadow</p>
+        <p class="shadow">Me too</p>
+        <slot></slot>
+
+        <my-el id="nested">
+          <template>
+            <p class="shadow">I'm deeper in the shadow</p>
+            <slot></slot>
+          </template>
+          <p class="light">I'm in the shade</p>
+        </my-el>
+
+        <my-el>
+          <template>
+            <p class="shadow">I'm deeper in the shadow 2</p>
+            <slot></slot>
+          </template>
+          <p class="light">I'm in the shade 2</p>
+        </my-el>
+      </template>
+      <p class="light">I'm in the light</p>
+    </my-el>
+    <script type="module">
+      import './helpers/my-el.js'
+
+      import '../index.js'
+      const { expect } = window.chai
+      describe('deep-selector-polyfill', () => {
+        describe('import behavior', () => {
+          it('installs the polyfill', () => {
+            expect(document.querySelector('my-el')).to.exist
+            expect(document.querySelector('my-el p.light')).to.exist
+            expect(document.querySelector('my-el /deep/ p.shadow')).to.exist
+            expect(document.querySelector('my-el /deep/ p.shadow').tagName).to.equal('P')
+          })
+        })
+
+        describe('window.__deepSelectorAlias', () => {
+          it('configures the selector', () => {
+            window.__deepSelectorAlias = '>>>'
+
+            expect(document.querySelector('my-el >>> p.shadow')).to.exist
+          })
+
+          after(() => {
+            window.__deepSelectorAlias = '/deep/'
+          })
+        })
+
+        describe('document.querySelector', () => {
+          it('queries in shadow roots', () => {
+            expect(document.querySelector('my-el p.light')).to.exist
+            expect(document.querySelector('my-el p.shadow')).to.not.exist
+            expect(document.querySelector('my-el /deep/ p.shadow')).to.exist
+
+            expect(
+              document.querySelector(
+                'my-el#root /deep/ my-el#nested /deep/ p.shadow'
+              )
+            ).to.exist
+            expect(
+              document.querySelector('my-el#root /deep/ my-el#nested p.light')
+            ).to.exist
+
+            expect(() => {
+              document.querySelector('my-el#root /deep/ p.light /deep/ p')
+            }).to.throw('p.light does not have a shadow root')
+
+            expect(document.querySelector('my-el /deep/ accordion-panel')).to
+              .not.exist
+            expect(document.querySelector('my-el /deep/ accordion-panel div'))
+              .to.not.exist
+            expect(() => {
+              document.querySelector('my-el /deep/ accordion-panel /deep/ div')
+            }).to.throw('accordion-panel does not exist')
+          })
+        })
+
+        describe('document.querySelectorAll', () => {
+          it('queries for multiple elements in shadow roots', () => {
+            expect(
+              document.querySelectorAll('my-el /deep/ p.shadow')
+            ).to.have.lengthOf(2)
+
+            expect(
+              document.querySelectorAll('my-el /deep/ my-el /deep/ p.shadow')
+            ).to.have.lengthOf(2)
+
+            expect(
+              document.querySelectorAll('my-el /deep/ my-el p.light')
+            ).to.have.lengthOf(2)
+          })
+        })
+
+        describe('element.querySelector', () => {
+          it('queries in shadow roots', () => {
+            const root = document.querySelector('my-el')
+            expect(root.querySelector('p.shadow')).to.not.exist
+            expect(root.querySelector('/deep/ p.shadow')).to.exist
+
+            expect(document.querySelector('#nested')).to.not.exist
+            expect(document.querySelector('#root #nested')).to.not.exist
+            const nested = document.querySelector('#root /deep/ #nested')
+            expect(nested.querySelector('.light')).to.exist
+            expect(nested.querySelector('.shadow')).to.not.exist
+            expect(nested.querySelector('/deep/ .shadow')).to.exist
+          })
+        })
+
+        describe('element.querySelectorAll', () => {
+          it('queries for multiple elements in shadow roots', () => {
+            const root = document.querySelector('my-el')
+            expect(root.querySelectorAll('my-el')).to.be.empty
+            expect(root.querySelectorAll('/deep/ my-el')).to.have.lengthOf(2)
+
+            const nstd = document.querySelector('#root /deep/ #nested')
+            expect(nstd.querySelectorAll('.light')).to.have.lengthOf(1)
+            expect(nstd.querySelectorAll('/deep/ .shadow')).to.have.lengthOf(1)
+          })
+        })
+      })
+    </script>
+  </body>
+</html>
